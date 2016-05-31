@@ -12,13 +12,13 @@ For the impatient:
 Let's say you've unpacked the .tar.gz file into a directory /path/to/LearnEDFM. 
 Then you can run and test the program by opening matlab and running:
 
-    $ cd /path/to/LearnEDFM
-    $ cd examples/
-    $ ex1
+    >> cd /path/to/LearnEDFM
+    >> cd examples/
+    >> ex1
 
 To build from the repository, execute the following commands first:
 
-    $ git clone https://github.com/dealii/dealii
+    $ git clone https://github.com/dwarftools/LearnEDFM
 
 Then start MATLAB and continue as before.
 
