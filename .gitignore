@@ -1,0 +1,56 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Exclude the documentation from the repository for now
+html/
+
+# Exclude the coverage report directory
+coverage/
+
+# Exclude the bin directory for now
+bin/
+
+# Exclude any temporary files
+*~
+
+# Exclude any Makefile
+Makefile
+
+# Exclude the CMake directories
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build/Makefile
+
+# Exclude the Qt Creator project files
+dwarf.config
+dwarf.creator
+dwarf.creator.user
+dwarf.files
+dwarf.includes
