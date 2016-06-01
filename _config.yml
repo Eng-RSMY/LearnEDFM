@@ -1,0 +1,44 @@
+url: https://y7kim.github.io
+baseurl: /agency-jekyll-theme/
+
+# Site settings
+title: LearnEDFM
+email: webmaster@gjan.de
+description: "Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description."
+
+
+# Team names, titles and social links
+people:
+- name: Gunnar Jansen
+  pic: 1
+  position: Lead Developer
+  social:
+    - title: twitter
+      url: #
+    - title: facebook
+      url: #
+    - title: stack-overflow
+      url: #
+
+# Social networks usernames (many more available: google-plus, flickr, dribbble, pinterest, instagram, tumblr, linkedin, etc.)
+social:
+  - title: twitter
+    url: http://twitter.com/jekyllrb
+  - title: facebook
+    url:
+  - title: stack-overflow
+    url: http://stackoverflow.com/questions/tagged/jekyll
+  - title: bitbucket
+    url: http://bitbucket.org/jekyll
+  - title: github
+    url: http://github.com/jekyll
+
+# Postal address (add as many lines as necessary)
+address:
+  - line: Rue Emile-Argand 11
+  - line: 2000 Neuchâtel
+  - line: Switzerland
+
+# Build settings
+markdown: kramdown
+permalink: pretty
