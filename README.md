@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/22450/dwarftools/LearnEDFM.svg)](https://zenodo.org/badge/latestdoi/22450/dwarftools/LearnEDFM)
 # LearnEDFM
 A numerical code to solve flow and transport in fractured porous media by the embedded discrete fracture method
 
