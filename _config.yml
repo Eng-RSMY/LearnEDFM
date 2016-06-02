@@ -14,14 +14,14 @@ people:
   position: Lead Developer
   social:
     - title: twitter
-      url: https://twitter.com/bmightyg
+      url: https://twitter.com/dwarftools_org
     - title: stack-overflow
       url: http://stackoverflow.com/users/1371788/gjan
 
 # Social networks usernames (many more available: google-plus, flickr, dribbble, pinterest, instagram, tumblr, linkedin, etc.)
 social:
   - title: twitter
-    url: #
+    url: https://twitter.com/dwarftools_org
   - title: stack-overflow
     url: http://stackoverflow.com/questions/tagged/learnedfm
   - title: github
