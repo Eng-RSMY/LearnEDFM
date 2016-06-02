@@ -27,7 +27,7 @@ Detailed instructions can be found in the user manual.
 License:
 --------
 
-Please see the file ./LICENSE for details
+We wan't to provide you with the freedom to use and modify the code, but care about sharing with the community. Therefore the LearnEDFM source code is released under the GNU General Public License (GPL) v3. The GNU GPL v3 is a copyleft license that requires anyone who distributes the source code or a derivative work to make the source available under the same terms. Please see the file ./LICENSE for details
 
 Further information:
 --------------------
