@@ -1,0 +1,11 @@
+---
+title: Fracture permeability constrast
+subtitle: Crossed fractures - Influence of the permeability contrast
+layout: default
+modal-id: 2
+date: 2014-07-17
+img: ex2.png
+thumbnail: ex2-thumbnail.png
+alt: image-alt
+description: Influence of the permeability contrast between fracture & matrix is studied in this example. We compute pressure and transport solutions for the cross shaped fracture test case. Shown here: Pressure distribution. The test case also deals with the transport solution of the coupled problem.
+---

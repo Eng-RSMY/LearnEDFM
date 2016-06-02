@@ -1,0 +1,14 @@
+---
+title: Pressure validation
+subtitle: Crossed fracture pressure validation test case
+layout: default
+modal-id: 1
+img: ex1.png
+thumbnail: ex1-thumbnail.png
+alt: image-alt
+description: Lorem ipsum dolor sit amet, usu cu alterum nominavi lobortis. At duo novum diceret. Tantas apeirian vix et, usu sanctus postulant inciderint ut, populo diceret necessitatibus in vim. Cu eum dicam feugiat noluisse.
+
+To validate the model a test case first presented by (Hajibeygi et al., 2011) is used. The test case consists of two perpendicular intersecting fractures in the middle of a
+square domain. EDFM and reference solution show excellent agreement.
+
+---

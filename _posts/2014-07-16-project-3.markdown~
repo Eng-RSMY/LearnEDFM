@@ -1,0 +1,11 @@
+---
+title: Complex fracture network
+subtitle: Coupled flow and transport in complex fracture network
+layout: default
+modal-id: 3
+date: 2014-07-16
+img: ex3.png
+thumbnail: ex3-thumbnail.png
+alt: image-alt
+description: Complex fracture network test case including gravity effects. For a complete discription of this example please refer to the user manual. Shown here: Tracer concentration after 14h simulation.
+---

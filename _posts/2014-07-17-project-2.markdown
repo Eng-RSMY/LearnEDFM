@@ -1,15 +1,11 @@
 ---
-title: Escape
-subtitle: Website Design
+title: Fracture permeability constrast
+subtitle: Crossed fractures - Influence of the permeability contrast
 layout: default
 modal-id: 2
 date: 2014-07-17
-img: escape.png
-thumbnail: escape-thumbnail.png
+img: ex2.png
+thumbnail: ex2-thumbnail.png
 alt: image-alt
-project-date: April 2014
-client: Start Bootstrap
-category: Web Development
-description: Lorem ipsum dolor sit amet, usu cu alterum nominavi lobortis. At duo novum diceret. Tantas apeirian vix et, usu sanctus postulant inciderint ut, populo diceret necessitatibus in vim. Cu eum dicam feugiat noluisse.
-
+description: Influence of the permeability contrast between fracture & matrix is studied in this example. We compute pressure and transport solutions for the cross shaped fracture test case. Shown here is the pressure distribution. The test case also deals with the transport solution of the coupled problem.
 ---

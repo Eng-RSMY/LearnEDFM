@@ -1,10 +1,10 @@
-url: https://y7kim.github.io
-baseurl: /agency-jekyll-theme/
+url: https://dwarftools.github.io
+baseurl: /LearnEDFM
 
 # Site settings
 title: LearnEDFM
-email: webmaster@gjan.de
-description: "Write an awesome description for your new site here. You can edit this line in _config.yml. It will appear in your document head meta (for Google search results) and in your feed.xml site description."
+email: gjan@dwarftools.org
+description: "LearnEDFM - An open source implementation of the embedded discrete fracture model in MATLAB."
 
 
 # Team names, titles and social links
@@ -14,24 +14,18 @@ people:
   position: Lead Developer
   social:
     - title: twitter
-      url: #
-    - title: facebook
-      url: #
+      url: https://twitter.com/bmightyg
     - title: stack-overflow
-      url: #
+      url: http://stackoverflow.com/users/1371788/gjan
 
 # Social networks usernames (many more available: google-plus, flickr, dribbble, pinterest, instagram, tumblr, linkedin, etc.)
 social:
   - title: twitter
-    url: http://twitter.com/jekyllrb
-  - title: facebook
-    url:
+    url: #
   - title: stack-overflow
-    url: http://stackoverflow.com/questions/tagged/jekyll
-  - title: bitbucket
-    url: http://bitbucket.org/jekyll
+    url: http://stackoverflow.com/questions/tagged/learnedfm
   - title: github
-    url: http://github.com/jekyll
+    url: https://github.com/dwarftools/LearnEDFM
 
 # Postal address (add as many lines as necessary)
 address:
