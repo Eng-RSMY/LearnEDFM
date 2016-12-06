@@ -1,4 +1,4 @@
-function [sNew] = transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
+function [cNew] = transport_mass_System(cN,cNf,vx,vy,vf,Vfm,Vmf,Vff,Q,QC,phi,phi_f,K_f)
 %  Assembles and solves the transport system. It consists of the
 %  subfunctions for advective and diffusive transport
 %  ---------------------------------------------------------------------
@@ -26,54 +26,61 @@ function [sNew] = transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
 %  Acknowledgement:  Thanks are due to Manav Tyagi and Hadi Hajibeygi for
 %                    contributing to the very early development of the code.
 %
-%  transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
+%  transportSystem(cN,cNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
 %
 %  Input: 
-%        sN     (nx,ny)         old transport solution on the matrix
-%        sNf    (nf,1)          old transport solution in the fractures
+%        cN     (nx,ny)         old transport solution on the matrix
+%        cNf    (nf,1)          old transport solution in the fractures
 %        vx     (nx+1,ny)       matrix velocity in the x direction
 %        vy     (nx,ny+1)       matrix velocity in the y direction
 %        vf     (nf,1)          fracture velocity
 %        Vfm    (nf,nx*ny)      velocity matrix between fracture and matrix
 %        Vmf    (nx*ny,nf)      velocity matrix between matrix and fracture
 %        Vff    (nf*nf,nf*nf)   fracture-fracture intersection velocity
-%        Dfm    (nf,nx*ny)      coupling matrix between fracture and matrix
-%                               for transport diffusion
-%        Dmf    (nx*ny,nf)      coupling matrix between matrix and fracture
-%                               for transport diffusion
 %        phix   (nx+1,ny)       matrix porosity at the interface in
 %                               x-direction
 %        phiy   (nx,ny+1)       matrix porosity at the interface in
 %                               y-direction
 %
 %  Output: 
-%        sNew  (nx*ny+nf,1)     new transport solution vector
+%        cNew  (nx*ny+nf,1)     new transport solution vector
 
 
-global phi phi_f dx dxf dt Dif Nf Nf_f Nf_i K_f
+global dx dxf dt DifC Nf Nf_f Nf_i cmax alphal alphat
+
+%-------------------------------------------------------------------------%
+% Calculate matrix interface permeability & porosity (harmonic average)
+%-------------------------------------------------------------------------%
+[phix, phiy] = calc_interface_values(phi);
 
 %-------------------------------------------------------------------------%
 %    Build Transport System                                               %
 %-------------------------------------------------------------------------%
-[Up,r]  = transportAdvection(vx,vy,vf,Vfm,Vmf,Vff,Nf,Nf_f,Nf_i);           % Convective Upwind Matrix
+[Up,r]  = transport_mass_Advection(vx,vy,vf,Vfm,Vmf,Vff,Q,QC,Nf,Nf_f,Nf_i,cN);        % Convective Upwind Matrix
 
-if Dif == 0;
+if DifC == 0;
    Di = sparse(prod(Nf)+Nf_f,prod(Nf)+Nf_f);
    ri = sparse(prod(Nf)+Nf_f,1);
 else
-  [Di,ri] = transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf);              % Diffusive Matrix 
+  [Di,ri] = transport_mass_Diffusion(Nf,Nf_f,dx,phix,phiy);              % Diffusive Matrix 
 end
    
+if alphat == 0 && alphal == 0;
+   Disp = sparse(prod(Nf)+Nf_f,prod(Nf)+Nf_f);
+else
+   [Disp]  = transport_mass_Dispersion(Nf,Nf_f,dx,vx,vy);                                % Dispersive Matrix
+end
+
 Ac      = sparse(phi.*prod(dx)/dt);                                        % Accumulation term matrix
 Acf = sparse(phi_f.*dxf.*sqrt(12.*K_f)/dt);                                % Accumulation term fracture
 
 Ac = [Ac(:); Acf(:)];                                                      % Combine the accumulation terms
-snnf = [sN(:); sNf(:)];                                                    % for matrix and fracture
+snnf = [cN(:); cNf(:)];                                                    % for matrix and fracture
 
-A       = Up + diag(Ac(:)) + Di;                                           % Stiffness matrix
+A       = Up + diag(Ac(:)) + Di + Disp;                                    % Stiffness matrix
 rhs     = r + ri + sparse(snnf(:).*Ac(:));                                 % Right hand side
 
 %-------------------------------------------------------------------------%
 %    Solve Transport System                                               %
 %-------------------------------------------------------------------------%
-sNew = A\rhs;
+cNew = A\rhs;

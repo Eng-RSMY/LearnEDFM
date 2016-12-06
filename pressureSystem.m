@@ -1,4 +1,4 @@
-function [A,rhs] = pressureSystem(Fix,ibcs,Tx,Ty,Tf,G,Gf,Q, Tfm, Tmf,Tff, Nf_i)
+function [u] = pressureSystem(pOld,pOldf,Fix,ibcs,Tx,Ty,Tf,g,gf,Q, Tfm,Tff, Nf_i,phi, phi_f, density_l,density_lf, K_f)
 %  pressureSystem constructs the coefficient matrix and the right hand side
 %  ---------------------------------------------------------------------
 %  Copyright (C) 2016 by the LearnEDFM authors
@@ -74,10 +74,10 @@ function [A,rhs] = pressureSystem(Fix,ibcs,Tx,Ty,Tf,G,Gf,Q, Tfm, Tmf,Tff, Nf_i)
 %                    providing the initial core of this function
 %
 %-------------------------------------------------------------------------%
-
 n    = size(Tx) - [1 0];                                                   % Calculate the logical grid dimension (Tx has dimension (nx+1,ny)...)
 nf   = length(Tf) -length(Nf_i);                                           % Calculate the logical grid dimension (Tf has dimension (nf+1,1)...)
 ibcs = logical(ibcs);                                                      % Convert to logical
+
 N_fractures = length(Nf_i);                                                % Calculate the number of fractures
 
 %-------------------------------------------------------------------------%
@@ -94,29 +94,16 @@ Tynorth(:,2:n(2))   = Ty(:,2:n(2)); Tynorth(:,1)    = 0;
 Txwest (1:n(1)-1,:) = Tx(2:n(1),:); Txwest(n(1),:)  = 0;
 Tysouth(:,1:n(2)-1) = Ty(:,2:n(2)); Tysouth(:,n(2)) = 0;
 
-Tfeast = zeros(nf,1);
-Tfwest = zeros(nf,1);
-
-ios = 0;                                                                   % offset counter for positioning in global fracture vector
-for i= 1:N_fractures
-    Tfeast(ios+2:ios+Nf_i(i))     = Tf(ios+2:ios+Nf_i(i));
-    Tfwest(ios+1:ios+Nf_i(i)-1)   = Tf(ios+2:ios+Nf_i(i));
-    Tfeast(ios+1)     = 0;
-    Tfwest(ios+Nf_i(i)) = 0;                                               % Note the procedure on global indexing used here which is 
-                                                                           % explained in the calculation of the fracture interface
-                                                                           % permeabilities in the EDFM main file
-    ios = ios + Nf_i(i);
-end    
+[frac_left_flux_mat, frac_right_flux_mat] = calc_frac_flux_mat(N_fractures,nf, Nf_i);
 
 %-------------------------------------------------------------------------%
 %    preparing and setting the diagonals of the matrix A                  %
 %-------------------------------------------------------------------------%
-
 Ds      = [Tysouth(:) Txwest(:) zeros(prod(n),1) Txeast(:) Tynorth(:)];
 Ds(:,3) = -sum(Ds,2);
 A       = spdiags(-Ds,[-n(1),-1,0,1,n(1)],n(1)*n(2),n(1)*n(2));
 
-Dsf      = [Tfwest zeros(nf,1) Tfeast];
+Dsf      = [frac_right_flux_mat*Tf zeros(nf,1) frac_left_flux_mat*Tf];
 Dsf(:,2) = -sum(Dsf,2);
 Af       = spdiags(-Dsf,[-1,0,1],nf,nf);
 
@@ -124,9 +111,10 @@ Af       = spdiags(-Dsf,[-1,0,1],nf,nf);
 %    preparing the right hand side of the equation                        %
 %-------------------------------------------------------------------------%
 
-rhs = sparse(reshape(Q + G,prod(n),1));
+rhs = sparse(reshape(Q + (g(:,2:n(2)+1) - g(:,1:n(2))),prod(n),1));
 
-rhsf = Gf;
+global frac_grad_mat
+rhsf = frac_grad_mat*gf;
 
 %-------------------------------------------------------------------------%
 %    boundary conditions                                                  %
@@ -159,13 +147,6 @@ rhs(iD2,:) = rhs(iD2,:) + t2.*Fix(i2(ibcs(i2)),:);
 rhs(iD3,:) = rhs(iD3,:) + t3.*Fix(i3(ibcs(i3)),:);
 rhs(iD4,:) = rhs(iD4,:) + t4.*Fix(i4(ibcs(i4)),:);
 
-% Dirichlet boundary conditions for the fracture. This is only for test
-% purposes and should not be used in most situations
-% Af(1,1) = Af(1,1) + Tf(1);
-% Af(nf,nf) = Af(nf,nf) + Tf(nf);
-% rhsf(1) = rhsf(1) + Tf(1)*1000;
-% rhsf(nf) = rhsf(nf) + Tf(nf)*0;
-
 %-----------%
 %  Neumann  %
 %-----------%
@@ -181,6 +162,7 @@ rhs(iN4,:) = rhs(iN4,:) + Fix(i4(~ibcs(i4)),:);
 %-------------------------------------------------------------------------%
 %    merging matrix and fracture matrix and rhs                           %
 %-------------------------------------------------------------------------%
+Tmf = Tfm';
 Ds = sum(Tmf,2);
 DsT = sum(Tfm,2);
 [m,n]=size(A);
@@ -192,7 +174,9 @@ Bff = spdiags(Ds,0,nf,nf);                                                 % Dia
 Tff = Tff +Bff;
 
 A = A + B;
-Af = Af + Bf + Tff;
-A = [A -Tmf; Tfm -Af];                                                     % Build the coupled pressure block matrix
+Af = Af + Bf - Tff;
 
-rhs = vertcat(rhs,rhsf);                                                   % Concenate the RHS vectors of matrix and fracture
+A = [A -Tmf; Tfm -Af];                                                     % Build the coupled pressure block matrix
+rhs = vertcat(rhs,rhsf);  
+
+u = A\rhs;                                                         % Solve the pressure equation

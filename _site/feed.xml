@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>LearnEDFM</title>
+    <description>LearnEDFM - An open source implementation of the embedded discrete fracture model in MATLAB.</description>
+    <link>https://dwarftools.github.io/LearnEDFM/</link>
+    <atom:link href="https://dwarftools.github.io/LearnEDFM/feed.xml" rel="self" type="application/rss+xml" />
+    <pubDate>Thu, 02 Jun 2016 10:41:27 +0200</pubDate>
+    <lastBuildDate>Thu, 02 Jun 2016 10:41:27 +0200</lastBuildDate>
+    <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>Pressure validation</title>
+        <description>
+</description>
+        <pubDate>Fri, 18 Jul 2014 00:00:00 +0200</pubDate>
+        <link>https://dwarftools.github.io/LearnEDFM/2014/07/18/project-1/</link>
+        <guid isPermaLink="true">https://dwarftools.github.io/LearnEDFM/2014/07/18/project-1/</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>Fracture permeability constrast</title>
+        <description>
+</description>
+        <pubDate>Thu, 17 Jul 2014 00:00:00 +0200</pubDate>
+        <link>https://dwarftools.github.io/LearnEDFM/2014/07/17/project-2/</link>
+        <guid isPermaLink="true">https://dwarftools.github.io/LearnEDFM/2014/07/17/project-2/</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>Complex fracture network</title>
+        <description>
+</description>
+        <pubDate>Wed, 16 Jul 2014 00:00:00 +0200</pubDate>
+        <link>https://dwarftools.github.io/LearnEDFM/2014/07/16/project-3/</link>
+        <guid isPermaLink="true">https://dwarftools.github.io/LearnEDFM/2014/07/16/project-3/</guid>
+        
+        
+      </item>
+    
+  </channel>
+</rss>

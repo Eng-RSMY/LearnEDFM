@@ -1,4 +1,4 @@
-function [vx,vy,vf,Vfm,Vmf,Vff] = calcVelocity(p,pf,Tx,Ty,Tf,Tfm,Tmf,Tff,g,gf)
+function [vx,vy,vf,Vfm,Vmf,Vff] = calcVelocity(p,pf,Tx,Ty,Tf,Tfm,Tff,g,gf)
 %  calcVelocity Calculates the velocity field from the pressure
 %  ---------------------------------------------------------------------
 %  Copyright (C) 2016 by the LearnEDFM authors
@@ -47,10 +47,10 @@ function [vx,vy,vf,Vfm,Vmf,Vff] = calcVelocity(p,pf,Tx,Ty,Tf,Tfm,Tmf,Tff,g,gf)
 %        Vmf    (nx*ny,nf)      velocity matrix between matrix and fracture
 %        Vff    (nf*nf,nf*nf)   fracture-fracture intersection velocity
  
-global Fix ibcs Nf_i
+global Fix ibcs
+global frac_grad_expand_mat
 
 N = size(p);
-Nf = size(pf);
 
 %-------------------------------------------------------------------------%
 %   Calculate velocity direction for alpha                                %
@@ -77,18 +77,8 @@ vy(:,1) = vy(:,1)+(Fix(2*N(2)+1:2*N(2)+N(1)).*~ibcs(2*N(2)+1:2*N(2)+N(1)));
 vy(:,N(2)+1) = (-Ty(:,N(2)+1).*(Fix(2*N(2)+N(1)+1:2*N(2)+2*N(1))-p(:,N(2))) - g(:,N(2)+1)).*ibcs(2*N(2)+N(1)+1:2*N(2)+2*N(1));   % North (adjust Neumann sign!)
 vy(:,N(2)+1) = vy(:,N(2)+1)-(Fix(2*N(2)+N(1)+1:2*N(2)+2*N(1)).*~ibcs(2*N(2)+N(1)+1:2*N(2)+2*N(1)));
 
-%--------------------- velocity in fractures -----------------------------%                                 
-vf = zeros(Nf(1)+length(Nf_i),Nf(2));
-ios = 0;                                                                   % offset counter for positioning in global fracture vector
-lios = 0;
-N_fractures = length(Nf_i);
-for i= 1:N_fractures
-    vf(lios+2:lios+Nf_i(i)) = -Tf(ios+2:ios+Nf_i(i)).*(pf(ios+2:ios+Nf_i(i))-pf(ios+1:ios+Nf_i(i)-1) - gf(ios+2:ios+Nf_i(i))); 
-    lios = lios + Nf_i(i) + 1;
-    ios = ios + Nf_i(i);                                                   % Note the procedure on global indexing used here which is 
-                                                                           % explained in the calculation of the fracture interface
-                                                                           % permeabilities in the EDFM main file
-end  
+%--------------------- velocity in fractures -----------------------------%
+vf = -Tf.*(frac_grad_expand_mat*pf-gf);
 
 %--------------------- velocity fracture-fracture-------------------------%                                 
 Vff = bsxfun(@times, pf, Tff) - bsxfun(@times,pf',Tff);
@@ -96,5 +86,5 @@ Vff = bsxfun(@times, pf, Tff) - bsxfun(@times,pf',Tff);
 %--------------------- velocity fracture-matrix---------------------------% 
 Vfm = bsxfun(@times, pf, Tfm) - bsxfun(@times, p(:)',Tfm);
 %--------------------- velocity matrix-fracture---------------------------%
-Vfm = -Vfm;
-Vmf = Vfm';
+Vmf = -Vfm';
+

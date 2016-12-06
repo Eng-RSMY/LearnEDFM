@@ -21,9 +21,9 @@ ylabel('x [m]')
 
 figure 
 hold on;
-pcolor(x,y,sNew'); shading interp
+pcolor(x,y,cNew'); shading interp
 axis square
-[C,hfigc] = contour(x, y, sNew',5,'ShowText','off');
+[C,hfigc] = contour(x, y, cNew',5,'ShowText','off');
 set(hfigc, ...
     'LineWidth',1.0, ...
     'Color', [0 0 0]);

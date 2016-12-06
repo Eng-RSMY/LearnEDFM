@@ -1,4 +1,4 @@
-function [Tx,Ty,Tf,Gr,g,Grf,gf, lambda, lambda_f] = initialize(S,Sf,T,Tf)
+function [Tx,Ty,Tf,Tfm,Tff,g,gf,density_l,density_lf] = initialize(K, K_f,c,cf,T,Tf,p,pf,CI,row,col)
 %  Initialize updates the transmissivity based on the saturation and
 %  temperature
 %  ---------------------------------------------------------------------
@@ -26,8 +26,8 @@ function [Tx,Ty,Tf,Gr,g,Grf,gf, lambda, lambda_f] = initialize(S,Sf,T,Tf)
 %  Initialize(S,Sf,T,Tf)
 %
 %  Input: 
-%        S      (nx,ny)         matrix saturation
-%        Sf     (nf,1)          fracture saturation
+%        c      (nx,ny)         matrix tracer concentration
+%        cf     (nf,1)          fracture tracer concentration
 %        T      (nx,ny)         matrix temperature
 %        Tf     (nf,1)          fracture temperature
 %
@@ -42,101 +42,94 @@ function [Tx,Ty,Tf,Gr,g,Grf,gf, lambda, lambda_f] = initialize(S,Sf,T,Tf)
 %        lambda (nx,ny)         total mobility of fine grid cells
 %        lambda_f (nf,1)        total mobility of the fracture segments
 
-global Txk Tyk dx viscosity FixT ibcs gravity density smax Nf_f Nf_i dxf Tfk K K_f frac_angle
-                
-N = size(S);
+global dx dxf gravity Nf Nf_f Nf_i frac_angle
+global frac_mean_mat frac_grad_mat 
+global FixT ibcs  
+
+N = size(c);
 
 %-------------------------------------------------------------------------%
 %    Initialize                                                           %
 %-------------------------------------------------------------------------%
+viscosity = 2.414e-5*10.^(247.8./(T+273.15-140));
+viscosity_f = 2.414e-5*10.^(247.8./(Tf+273.15-140));
 
-i1 = 1:N(2);             i2  = N(2) + (1:N(2));                            
-i3 = 2*N(2) + (1:N(1));  i4  = 2*N(2) + N(1) + (1:N(1));
-
-bcwest(1:N(2))  = FixT(i1);
-bceast(1:N(2))  = FixT(i2);
-bcsouth(1:N(1)) = FixT(i3);
-bcnorth(1:N(1)) = FixT(i4);
-
-Satx           = sparse(N(1)+1,N(2));
-Satx(2:N(1),:) = (S(2:N(1),:) + S(1:N(1)-1,:))./2./smax;
-Satx(1,:)      = (S(1,:) + bcwest(1:N(2)))./2./smax;
-Satx(N(1)+1,:) = (S(N(1),:) + bceast(1:N(2)))./2./smax;
-
-Saty           = sparse(N(1),N(2)+1)./smax;
-Saty(:,2:N(2)) = (S(:,2:N(2)) + S(:,1:N(2)-1))./2./smax;
-Saty(:,1)      = (S(:,1) + bcsouth(1:N(1))')./2./smax;
-Saty(:,N(2)+1) = (S(:,N(2)) + bcnorth(1:N(1))')./2./smax;
-
-N_fractures = length(Nf_i);
-Satf           = zeros(Nf_f+N_fractures,1);                                          
-ios = 0;                                                                   % offset counter for positioning in global fracture vector
-lios = 0;                                                                  % offset counter for the left side
-for i= 1:N_fractures
-    Satf(lios+2:lios+Nf_i(i)) = (Sf(ios+2:ios+Nf_i(i)) + Sf(ios+1:ios+Nf_i(i)-1))./2./smax; 
-    Satf(lios+1)              = Sf(ios+1)./smax;
-    Satf(lios+Nf_i(i)+1)      = Sf(ios+Nf_i(i))./smax;
-    
-    lios = lios + Nf_i(i) + 1;
-    ios = ios + Nf_i(i);                                                   % Note the procedure on global indexing used here which is 
-                                                                           % explained in the calculation of the fracture interface
-                                                                           % permeabilities in the EDFM main file
-end  
+[density_l, density_lf] = calc_density(T,Tf,p,pf);
 
 %-------------------------------------------------------------------------%
-%    Calculate upwind Lamda total                                         %
+% Calculate matrix interface permeability & porosity (harmonic average)
 %-------------------------------------------------------------------------%
-lambda = K./((1-S).*viscosity(1) + S.*viscosity(2));
-lambda_f = K_f./((1-Sf).*viscosity(1) + Sf.*viscosity(2));
+[Kx, Ky] = calc_interface_values(K);
+[Kf] = calc_interface_values_fracture(K_f);
 
-mux   = (1-Satx).*viscosity(1) + Satx.*viscosity(2);
-muy   = (1-Saty).*viscosity(1) + Saty.*viscosity(2);
+[viscosityx, viscosityy] = calc_interface_values(viscosity);
+[viscosityf] = calc_interface_values_fracture(viscosity_f);
 
-muf   = (1-Satf).*viscosity(1) + Satf.*viscosity(2);
+[~, densityy] = calc_interface_values(density_l);
+[densityf] = calc_interface_values_fracture(density_lf);
+
 
 %-------------------------------------------------------------------------%
 %    Gravity for the matrix                                               %
 %-------------------------------------------------------------------------%
 
-Gy    = ((1-Saty).*density(1) + Saty.*density(2)).*gravity;
-g            = Tyk./muy.*Gy.*dx(1);                                        % Gravity term with respect to the interfaces
+Gy    = densityy.*gravity;                    % TODO: Add the temperature dependence here
+g            = Ky./viscosityy.*Gy.*dx(1);                                        % Gravity term with respect to the interfaces
 g(:,1)       = g(:,1).*ibcs(2*N(2)+1:2*N(2)+N(1)); 
 g(:,N(2)+1)  = g(:,N(2)+1).*ibcs(2*N(2)+N(1)+1:2*N(2)+2*N(1)); 
-Gr           = g(:,2:N(2)+1) - g(:,1:N(2));                                % Gravity term corresponding to fine cells
 
 %-------------------------------------------------------------------------%
 %    Gravity for the fractures                                            %
 %-------------------------------------------------------------------------%
-% The gravity computations on the fractures are a little bit more
-% complicated. A couple of index shifts have to be performed throughout
-% this file to achieve all the right dimensions of the requiered fields.
-Gyf           = zeros(Nf_f+N_fractures,1);                                          
-lios = 0;                                                                  % offset counter for positioning in global fracture vector
-for i= 1:N_fractures
-    
-    Gyf(lios+1:lios+Nf_i(i)+1) = ((1-Satf(lios+1:lios+Nf_i(i)+1)).*density(1) ...
-                                + Satf(lios+1:lios+Nf_i(i)+1).*density(2)).*gravity.*sin(frac_angle(i)*pi/180); 
-                                                                           
-    lios = lios + Nf_i(i) + 1;                                             % Note the procedure on global indexing used here which is 
-                                                                           % explained in the calculation of the fracture interface
-                                                                           % permeabilities in the EDFM main file
-end  
-         
-gf           = Tfk./muf.*Gyf.*sqrt(12*Tfk);                                % Cubic law is used here instead of fixed aperture
-Grf           = zeros(Nf_f,1);                                          
-ios = 0;                                                                   % offset counter for positioning in global fracture vector
-lios =0;
-for i= 1:N_fractures
-    Grf(lios+1:lios+Nf_i(i)) = gf(ios+2:ios+Nf_i(i)+1) - gf(ios+1:ios+Nf_i(i));
-    ios = ios + Nf_i(i)+1; 
-    lios = lios + Nf_i(i);
-end  
+interface_frac_angle = 0.5*frac_mean_mat*frac_angle';
+Gyf= densityf.*gravity.*sin(interface_frac_angle*pi/180);%.*dx_f;         
+
+gf           = -Kf./viscosityf.*Gyf.*sqrt(12*Kf);                                % Cubic law is used here instead of fixed aperture
+Ni=zeros(size(Nf_i));
+N_fractures = length(Nf_i);
+for i=1:N_fractures
+    for j=i:-1:1
+        Ni(i) = Ni(i) +Nf_i(j);
+    end
+end
+Nii = 1:1:length(Ni);
+
+gf(Ni-Nf_i+Nii) = 0; 
+gf(Ni+Nii) = 0;
 
 %-------------------------------------------------------------------------%
 %    Transmissivities                                                     %
 %-------------------------------------------------------------------------%
-Tx           = Txk./mux.*dx(2)./dx(1);                                     % Transmissivities
-Ty           = Tyk./muy.*dx(1)./dx(2);
-Tf           = Tfk./muf./dxf.*sqrt(12*Tfk);                                % The fracture aperture is calculated by the
+Tx           = Kx./viscosityx.*dx(2)./dx(1);                                     % Transmissivities
+Ty           = Ky./viscosityy.*dx(1)./dx(2);
+Tf           = Kf./viscosityf./dxf.*sqrt(12*Kf);                                % The fracture aperture is calculated by the
                                                                            % cubic law instead of this fixed setting.
-                                                                           
+                                                                                                                                             
+%% Matrix-Fracture transmissivity
+%  This assembles the matrix-fracture transmissivity based on the
+%  previously computed connectivity index
+l = Nf_f;
+n = Nf;
+X = zeros(length(CI),1);
+for i = 1:length(CI)
+    indm = CI(i,1);
+    indf = CI(i,2);
+    lambda_ij = K(indm)/viscosity(indm);
+    lambda_k = K_f(indf)/viscosity_f(indf);
+    X(i)  =  CI(i,3)*2*lambda_ij*lambda_k/(lambda_ij+lambda_k);                  %Harmonic mean for the fracture-matrix transmissivity 
+    [ii,jj] = ind2sub(Nf,CI(i,1));          
+    I(i) = (jj-1)*n(1)+ii;
+end
+if (isempty(CI))
+    Tfm = sparse(zeros(n(1)*n(2),l));
+else
+    Tfm = sparse(I,CI(:,2),X,n(1)*n(2),l);
+end
+Tfm = Tfm';
+
+
+% Find intersection points between the fracture segments
+alpha_row = sqrt(12*K_f(row)).*K_f(row)./viscosityf(row)./(0.5*dxf);                   % Cubic law is used here instead of fixed aperture
+alpha_col = sqrt(12*K_f(col)).*K_f(col)./viscosityf(col)./(0.5*dxf);                   % Cubic law is used here instead of fixed aperture
+Tflk = alpha_row.*alpha_col./(alpha_row+alpha_col);
+Tff = sparse(row,col,Tflk,l,l); 

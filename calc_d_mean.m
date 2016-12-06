@@ -33,7 +33,7 @@ function d_mean = calc_d_mean(dxx, dyy)
 %        d_mean   average distance between fracture and matrix
 
 dx = [dxx dyy];
-d_mean = (dx(1)+dx(2))/(3*sqrt(dx(1)*dx(1)+dx(2)*dx(2)));
+d_mean = (dx(1)*dx(2))/(3*sqrt(dx(1)*dx(1)+dx(2)*dx(2)));
 
 if (3*sqrt(dx(1)*dx(1)+dx(2)*dx(2)) == 0)
     d_mean = 0;

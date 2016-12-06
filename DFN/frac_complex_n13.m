@@ -30,7 +30,7 @@ xc = []; yc = [];
 xb = []; yb = [];
 xe = []; ye = [];
 
-beta = [-41 23 18 33 -19 -35 15 63 -73 45 46 47 64]; % Fracture angle [°]
+beta = [-41 23 18 33 -19 -35 15 63 -73 45 46 47 74]; % Fracture angle [°]
 xy = [50 450;
       50 350;
       50 240;
@@ -46,9 +46,10 @@ xy = [50 450;
       400 300;
       ];
   xy = xy./500;
-  L = [500 130 350 200 300 225 150 170 160 200 60 200 100];
+
+  L = [500 130 350 200 300 225 150 170 160 200 60 200 150];
   L = L./500;
-  L = round(L*len(1)./dxf,0);
+  L = floor(L*min(len(1),len(2))./dxf);
 
 for i=1:N_fractures 
     pass = 0;
@@ -75,29 +76,31 @@ for i=1:N_fractures
     end
     
     Nf_i(i) = length(xei);
-
-    xb =[xb xbi];
-    xe =[xe xei];
-    yb =[yb ybi];
-    ye =[ye yei];
+    
+    xb =[xb round(xbi,4)];
+    xe =[xe round(xei,4)];
+    yb =[yb round(ybi,4)];
+    ye =[ye round(yei,4)];
 end
 
 Nf_f = length(xe);
-frac_angle = beta+90;
+
 XY1 = [xb' yb' xe' ye'];
 XE = [xe; ye]';
+
+frac_angle = atan2((ye-yb),(xe-xb))*180/pi;
 
 % Comment in the following code to visualize the fracture network before
 % the simulation is started
 % -------------------------------------------------------------------------
-%ListOfVariables = who;
-%for k = 1:length(ListOfVariables)
+% ListOfVariables = who;
+% for k = 1:length(ListOfVariables)
 %   assignin('base',ListOfVariables{k},eval(ListOfVariables{k}))
-%end 
-%figure(221)
-%line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','[0 0.4470 0.7410]','LineWidth',3);
-%xlim([0 500]);
-%ylim([0 500]);
-%xlabel('x [m]');
-%ylabel('y [m]');
-%pause()
+% end 
+% figure(221)
+% line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','[0 0.4470 0.7410]','LineWidth',3);
+% xlim([0 500]);
+% ylim([0 500]);
+% xlabel('x [m]');
+% ylabel('y [m]');
+% pause()
