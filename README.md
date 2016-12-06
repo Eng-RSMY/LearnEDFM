@@ -4,7 +4,7 @@ A numerical code to solve flow and transport in fractured porous media by the em
 What is LearnEDFM?
 ------------------
 
-LearnEDFM is a MATLAb program solving flow and transport in fractured porous media using the embedded discrete fracture method. It is targeted at researchers in the field of subsurface simulations who want to understand and apply the embedded discrete fracture model.
+LearnEDFM is a MATLAB program solving flow and transport in fractured porous media using the embedded discrete fracture method. It is targeted at researchers in the field of subsurface simulations who want to understand and apply the embedded discrete fracture model.
 
 For the impatient:
 ------------------
@@ -14,6 +14,11 @@ Then you can run and test the program by opening matlab and running:
 
     >> cd /path/to/LearnEDFM
     >> cd examples/
+    >> ex1
+
+If this gives you an error message try to change back to the main directory and execute the example again.
+
+    >> cd ..
     >> ex1
 
 To build from the repository, execute the following commands first:

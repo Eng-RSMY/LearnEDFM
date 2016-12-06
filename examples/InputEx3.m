@@ -89,7 +89,7 @@ QT      = zeros(Nf);                    % normalized concentration for source te
 
 %% GRAVITY---------------------------------------------------------------------------------%
 global gravity
-gravity   = 0;                          % gravity acceleration in y [m/s2]
+gravity   = 9.81;                          % gravity acceleration in y [m/s2]
 
 %% PERMEABILITY ------------------------------------------------------------------------------------%
 K       = ones(Nf(1),Nf(2))*1e-9; 	    % permeability field [m2]
