@@ -45,14 +45,11 @@ function [Up,rhs] = transport_heat_Advection(vx,vy,vf,Vfm,Vmf,Vff,Q,QT,Nf,Nf_f,N
 %        Up    (nx*ny+nf,nx*ny+nf) advection matrix of the transport system
 %        rhs   (nx*ny+nf,1)      advection rhs of the transport system
 
-global FixT limx limy limxOld limyOld innerIter
+global FixT
 
 n    = Nf;
 nf   = Nf_f;
 N_fractures = length(Nf_i);                                                % Calculate the number of fractures
-
-scheme = 0;                                                                % Set the numerical scheme for the advection 
-                                                                           % 0 - Upwind / 1 - QUICK
 
 ix      = (1+sign(vx))/2;                                                  % Velocity indicator for upwinding
 iy      = (1+sign(vy))/2;                                                  % for aritmetic mean set ix = iy = 1/2
@@ -66,178 +63,28 @@ iy      = (1+sign(vy))/2;                                                  % for
 cprhovx = cprhox.*vx;
 cprhovy = cprhoy.*vy;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%                    FLUX LIMITER SCHEME (HQUICK)                 %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%-------------------------------------------------------------------------%
+%    Upwind Matrix                                                        %
+%-------------------------------------------------------------------------%
 
-if innerIter < 2
+upw(1:Nf(1),:) = -ix(1:Nf(1),:)   .*cprhovx(1:Nf(1),:);
+ups(:,1:Nf(2)) = -iy(:,1:Nf(2))   .*cprhovy(:,1:Nf(2));
+upe(1:Nf(1),:) =  (1-ix(2:Nf(1)+1,:)) .*cprhovx(2:Nf(1)+1,:);
+upn(:,1:Nf(2)) =  (1-iy(:,2:Nf(2)+1)) .*cprhovy(:,2:Nf(2)+1);
 
- deltax = zeros(n(1)+1,n(2));
- deltay = zeros(n(1),n(2)+1);
- tetax  = zeros(n(1)+1,n(2));
- tetay  = zeros(n(1),n(2)+1);
- 
- deltax(2:n(1),:) = T(2:n(1),:) - T(1:n(1)-1,:);
- deltay(:,2:n(2)) = T(:,2:n(2)) - T(:,1:n(2)-1);
+Txeast(2:n(1),:)   = upe(1:n(1)-1,:);    Txeast(1,:)     = 0;
+Tynorth(:,2:n(2))  = upn(:,1:n(2)-1);    Tynorth(:,1)    = 0;
+Txwest(1:n(1)-1,:) = upw(2:n(1),:);      Txwest(n(1),:)  = 0;
+Tysouth(:,1:n(2)-1)= ups(:,2:n(2));      Tysouth(:,n(2)) = 0;
 
- deltax(isinf(1./deltax)) = 1e-9;
- deltay(isinf(1./deltay)) = 1e-9;
- 
- tetax(2:n(1),:) = 1./deltax(2:n(1),:) .* (deltax(1:n(1)-1,:).*ix(2:n(1),:) + deltax(3:n(1)+1,:).*(1-ix(2:n(1),:)));
- tetay(:,2:n(2)) = 1./deltay(:,2:n(2)) .* (deltay(:,1:n(2)-1).*iy(:,2:n(2)) + deltay(:,3:n(2)+1).*(1-iy(:,2:n(2))));
+upd(1:Nf(1),1:Nf(2)) = ix(2:Nf(1)+1,1:Nf(2))   .*cprhovx(2:Nf(1)+1,1:Nf(2))...
+                  +iy(1:Nf(1),2:Nf(2)+1)   .*cprhovy(1:Nf(1),2:Nf(2)+1)...
+                  -(1-ix(1:Nf(1),1:Nf(2))) .*cprhovx(1:Nf(1),1:Nf(2))...
+                  -(1-iy(1:Nf(1),1:Nf(2))) .*cprhovy(1:Nf(1),1:Nf(2));
+Ds      = [Tysouth(:) Txwest(:) upd(:) Txeast(:) Tynorth(:)];
 
- limx = (tetax>=1) + (tetax<1).*(tetax>0).* tetax;
- limy = (tetay>=1) + (tetay<1).*(tetay>0).* tetay;
- 
-%  limx  = ones(n(1)+1,n(2));
-%  limy  = ones(n(1),n(2)+1);
-  
- limx(1:2,:)         = 0;
- limx(n(1):n(1)+1,:) = 0;
- limy(:,1:2)         = 0;
- limy(:,n(2):n(2)+1) = 0;
- 
- limxOld = limx;
- limyOld = limy;
-else 
-    
- limx = limxOld;
- limy = limyOld;
+Up   = spdiags(Ds,[-n(1) -1 0 1 n(1)],n(1)*n(2),n(1)*n(2));
 
-end
-
-if (scheme == 1)  % This is the QUICK scheme
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%             CONSTRUCT  FIRST ORDER SCHEME                       %%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    upw(1:n(1),:) = -ix(1:n(1),:)       .*cprhovx(1:n(1),:)   .* (1-limx(1:n(1),:));
-    ups(:,1:n(2)) = -iy(:,1:n(2))       .*cprhovy(:,1:n(2))   .* (1-limy(:,1:n(2)));
-    upe(1:n(1),:) =  (1-ix(2:n(1)+1,:)) .*cprhovx(2:n(1)+1,:) .* (1-limx(2:n(1)+1,:));
-    upn(:,1:n(2)) =  (1-iy(:,2:n(2)+1)) .*cprhovy(:,2:n(2)+1) .* (1-limy(:,2:n(2)+1));
-
-    upd(:,:)      = ix(2:n(1)+1,:)   .*cprhovx(2:n(1)+1,:) .*(1-limx(2:n(1)+1,:))...
-                   +iy(:,2:n(2)+1)   .*cprhovy(:,2:n(2)+1) .*(1-limy(:,2:n(2)+1))...
-                   -(1-ix(1:n(1),:)) .*cprhovx(1:n(1),:)   .*(1-limx(1:n(1),:))...
-                   -(1-iy(:,1:n(2))) .*cprhovy(:,1:n(2))   .*(1-limy(:,1:n(2)));
-
-    Upeast(2:n(1),:)   = upe(1:n(1)-1,:);    Upeast(1,:)     = 0;
-    Upnorth(:,2:n(2))  = upn(:,1:n(2)-1);    Upnorth(:,1)    = 0;
-    Upwest(1:n(1)-1,:) = upw(2:n(1),:);      Upwest(n(1),:)  = 0;
-    Upsouth(:,1:n(2)-1)= ups(:,2:n(2));      Upsouth(:,n(2)) = 0;
-
-    DsSt = [Upsouth(:) Upwest(:) upd(:) Upeast(:) Upnorth(:)];
-    UpSt = spdiags(DsSt,[-n(1) -1 0 1 n(1)],n(1)*n(2),n(1)*n(2));
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%             CONSTRUCT  HIGHER ORDER SCHEME (QUICK)              %%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %
-    % node positions: 
-    %
-    % w = west      ww = west(i-2)
-    % s = south
-    % n = north
-    % e = east
-    % p = center
-    %
-    % velocity directions:
-    %
-    % l = left 
-    % r = right
-    % u = up
-    % d = down
-    %
-    % example:
-    %
-    % Twwl  = west interface - west saturation - velocity from left
-    % Teeer = east interface - east-east saturation - velocity from right
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    upwl(1:n(1),:) = -ix(1:n(1),:)      .*cprhovx(1:n(1),:)   .* limx(1:n(1),:);
-    upsd(:,1:n(2)) = -iy(:,1:n(2))      .*cprhovy(:,1:n(2))   .* limy(:,1:n(2));
-    upel(1:n(1),:) =  ix(2:n(1)+1,:)    .*cprhovx(2:n(1)+1,:) .* limx(2:n(1)+1,:);                                                                                 
-    upnd(:,1:n(2)) =  iy(:,2:n(2)+1)    .*cprhovy(:,2:n(2)+1) .* limy(:,2:n(2)+1);
-
-    upwr(1:n(1),:) = -(1-ix(1:n(1),:))  .*cprhovx(1:n(1),:)   .* limx(1:n(1),:);
-    upsu(:,1:n(2)) = -(1-iy(:,1:n(2)))  .*cprhovy(:,1:n(2))   .* limy(:,1:n(2));
-    uper(1:n(1),:) =  (1-ix(2:n(1)+1,:)).*cprhovx(2:n(1)+1,:) .* limx(2:n(1)+1,:);                                                                                 
-    upnu(:,1:n(2)) =  (1-iy(:,2:n(2)+1)).*cprhovy(:,2:n(2)+1) .* limy(:,2:n(2)+1);
-
-    Twpl (1:n(1)  ,:) = upwl(1:n(1),:)  ;       
-    Twwl (1:n(1)-1,:) = upwl(2:n(1),:)  ;   Twwl(n(1),:)         = 0;
-    Twwwl(1:n(1)-2,:) = upwl(3:n(1),:)  ;   Twwwl(n(1)-1:n(1),:) = 0;
-    Twpr (1:n(1)  ,:) = upwr(1:n(1),:)  ;      
-    Twwr (1:n(1)-1,:) = upwr(2:n(1),:)  ;   Twwr(n(1),:)         = 0;
-    Twer (2:n(1),:)   = upwr(1:n(1)-1,:);   Twer(1,:)            = 0;
-
-    Tepl (1:n(1)  ,:) = upel(1:n(1),:)  ;      
-    Tewl (1:n(1)-1,:) = upel(2:n(1),:)  ;   Tewl(n(1),:)         = 0;
-    Teel (2:n(1),:)   = upel(1:n(1)-1,:);   Teel(1,:)            = 0;
-    Tepr (1:n(1)  ,:) = uper(1:n(1),:)  ;      
-    Teer (2:n(1),:)   = uper(1:n(1)-1,:);   Teer(1,:)            = 0;
-    Teeer(3:n(1),:)   = uper(1:n(1)-2,:);   Teeer(1:2,:)         = 0;
-
-    Tspd (:,1:n(2))   = upsd(:,1:n(2))  ;       
-    Tssd (:,1:n(2)-1) = upsd(:,2:n(2))  ;   Tssd(:,n(2))         = 0;
-    Tsssd(:,1:n(2)-2) = upsd(:,3:n(2))  ;   Tsssd(:,n(2)-1:n(2)) = 0;
-    Tspu (:,1:n(2)  ) = upsu(:,1:n(2))  ;      
-    Tssu (:,1:n(2)-1) = upsu(:,2:n(2))  ;   Tssu(:,n(2))         = 0;
-    Tsnu (:,2:n(2))   = upsu(:,1:n(2)-1);   Tsnu(:,1)            = 0;
-
-    Tnpd (:,1:n(2))   = upnd(:,1:n(2))  ;      
-    Tnsd (:,1:n(2)-1) = upnd(:,2:n(2))  ;   Tnsd(:,n(2))         = 0;
-    Tnnd (:,2:n(2))   = upnd(:,1:n(2)-1);   Tnnd(:,1)            = 0;
-    Tnpu (:,1:n(2))   = upnu(:,1:n(2))  ;      
-    Tnnu (:,2:n(2))   = upnu(:,1:n(2)-1);   Tnnu(:,1)            = 0;
-    Tnnnu(:,3:n(2))   = upnu(:,1:n(2)-2);   Tnnnu(:,1:2)         = 0;
-
-    Tc   = 3/8*Twpl + 6/8*Twpr + 6/8*Tepl + 3/8*Tepr... 
-         + 3/8*Tspd + 6/8*Tspu + 6/8*Tnpd + 3/8*Tnpu;
-
-    Tw   =  6/8*Twwl + 3/8*Twwr - 1/8*Tewl;
-    Tww  = -1/8*Twwwl;  
-    Te   =  6/8*Teer + 3/8*Teel - 1/8*Twer;
-    Tee  = -1/8*Teeer;
-
-    Ts   =  6/8*Tssd + 3/8*Tssu - 1/8*Tnsd;
-    Tss  = -1/8*Tsssd;
-    Tn   =  6/8*Tnnu + 3/8*Tnnd - 1/8*Tsnu;
-    Tnn  = -1/8*Tnnnu;
-
-    DsSd = [Tss(:) Ts(:) Tww(:) Tw(:) Tc(:) Te(:) Tee(:) Tn(:) Tnn(:)];
-    UpSd = spdiags(DsSd,[-2*n(1) -n(1) -2 -1 0 1 2 n(1) 2*n(1)],n(1)*n(2),n(1)*n(2));
-
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%                     CONSTRUCT  Upwind Matrix                    %%
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-    Up = UpSd + UpSt;
-
-else % This is the first order upwind scheme
-    %-------------------------------------------------------------------------%
-    %    Upwind Matrix                                                        %
-    %-------------------------------------------------------------------------%
-    
-    upw(1:Nf(1),:) = -ix(1:Nf(1),:)   .*cprhovx(1:Nf(1),:);
-    ups(:,1:Nf(2)) = -iy(:,1:Nf(2))   .*cprhovy(:,1:Nf(2));
-    upe(1:Nf(1),:) =  (1-ix(2:Nf(1)+1,:)) .*cprhovx(2:Nf(1)+1,:);
-    upn(:,1:Nf(2)) =  (1-iy(:,2:Nf(2)+1)) .*cprhovy(:,2:Nf(2)+1);
-
-    Txeast(2:n(1),:)   = upe(1:n(1)-1,:);    Txeast(1,:)     = 0;
-    Tynorth(:,2:n(2))  = upn(:,1:n(2)-1);    Tynorth(:,1)    = 0;
-    Txwest(1:n(1)-1,:) = upw(2:n(1),:);      Txwest(n(1),:)  = 0;
-    Tysouth(:,1:n(2)-1)= ups(:,2:n(2));      Tysouth(:,n(2)) = 0;
-
-    upd(1:Nf(1),1:Nf(2)) = ix(2:Nf(1)+1,1:Nf(2))   .*cprhovx(2:Nf(1)+1,1:Nf(2))...
-                          +iy(1:Nf(1),2:Nf(2)+1)   .*cprhovy(1:Nf(1),2:Nf(2)+1)...
-                          -(1-ix(1:Nf(1),1:Nf(2))) .*cprhovx(1:Nf(1),1:Nf(2))...
-                          -(1-iy(1:Nf(1),1:Nf(2))) .*cprhovy(1:Nf(1),1:Nf(2));
-    Ds      = [Tysouth(:) Txwest(:) upd(:) Txeast(:) Tynorth(:)];
-
-    Up   = spdiags(Ds,[-n(1) -1 0 1 n(1)],n(1)*n(2),n(1)*n(2));
-
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%                     CONSTRUCT  RHS                              %%

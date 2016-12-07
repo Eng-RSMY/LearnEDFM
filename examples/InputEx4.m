@@ -103,10 +103,6 @@ phi_f   = ones(Nf_f,1)*0.1;             % fracture porosity field
 density_s = 2000*ones(Nf);       % density of the rock [kg/m3]
 density_sf = 2000*ones(Nf_f,1); % density of the rock [kg/m3]
 
-%% IN SITU STRESS ------------------------------------------------------------------------%
-SH_max = 52e6*ones(Nf_f,1);                      % Maximum principal stress [Pa]
-SH_min = 20e6*ones(Nf_f,1);                      % Minimum principal stress [Pa]
-
 %% THERMAL DIFFUSION ------------------------------------------------------------------------%
 global lambda_l lambda_s cp_l cp_s ibcD
 lambda_l = 0.5;                           % Thermal conductivity of the fluid [W/(m*K)]
@@ -119,8 +115,3 @@ ibcD    = zeros(2*sum(Nf),1);           % 1 -> Diffusion on boundary cells
 global DifC ibcDC
 DifC     = 0;                  % [m2/s] molecular diffusion 
 ibcDC    = zeros(2*sum(Nf),1);           % 1 -> Diffusion on boundary cells
-
-%% MASS DISPERSION ------------------------------------------------------------------------%
-global alphal alphat
-alphal   = 0.0;                         % longitudinal dispersivity [m]
-alphat   = 0.0;                          % transversal dispersivity [m]

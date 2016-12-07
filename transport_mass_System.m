@@ -46,7 +46,7 @@ function [cNew] = transport_mass_System(cN,cNf,vx,vy,vf,Vfm,Vmf,Vff,Q,QC,phi,phi
 %        cNew  (nx*ny+nf,1)     new transport solution vector
 
 
-global dx dxf dt DifC Nf Nf_f Nf_i cmax alphal alphat
+global dx dxf dt DifC Nf Nf_f Nf_i cmax
 
 %-------------------------------------------------------------------------%
 % Calculate matrix interface permeability & porosity (harmonic average)
@@ -65,19 +65,13 @@ else
   [Di,ri] = transport_mass_Diffusion(Nf,Nf_f,dx,phix,phiy);              % Diffusive Matrix 
 end
    
-if alphat == 0 && alphal == 0;
-   Disp = sparse(prod(Nf)+Nf_f,prod(Nf)+Nf_f);
-else
-   [Disp]  = transport_mass_Dispersion(Nf,Nf_f,dx,vx,vy);                                % Dispersive Matrix
-end
-
 Ac      = sparse(phi.*prod(dx)/dt);                                        % Accumulation term matrix
 Acf = sparse(phi_f.*dxf.*sqrt(12.*K_f)/dt);                                % Accumulation term fracture
 
 Ac = [Ac(:); Acf(:)];                                                      % Combine the accumulation terms
 snnf = [cN(:); cNf(:)];                                                    % for matrix and fracture
 
-A       = Up + diag(Ac(:)) + Di + Disp;                                    % Stiffness matrix
+A       = Up + diag(Ac(:)) + Di;                                    % Stiffness matrix
 rhs     = r + ri + sparse(snnf(:).*Ac(:));                                 % Right hand side
 
 %-------------------------------------------------------------------------%
