@@ -47,8 +47,6 @@ n = length(XY);
 xl = [XY(:,1) XY(:,3)];
 yl = [XY(:,2) XY(:,4)];
 
-dims = size(Xq);
-Z = zeros(size(Xq));
 CI = [];
 
 % intersections2 = [];% This is used only in the
