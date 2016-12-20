@@ -1,4 +1,4 @@
-function [Di,ri] = transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf)
+function [Di,ri] = transport_heat_Diffusion(Nf,Nf_f,dx,phix,phiy)
 %  Creates the diffusion matrix  
 %  ---------------------------------------------------------------------
 %  Copyright (C) 2016 by the LearnEDFM authors
@@ -22,7 +22,7 @@ function [Di,ri] = transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf)
 %  Authors: Gunnar Jansen, University of Neuchatel, 2016 
 %           Ivan Lunati, Rouven Kuenze, University of Lausanne, 2012
 %
-%  transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf)
+%  transportDiffusion(Nf,Nf_f,dx,phix,phiy)
 %
 %  Input: 
 %        Nf     (2,1)           matrix grid dimensions
@@ -32,19 +32,15 @@ function [Di,ri] = transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf)
 %                               x-direction
 %        phiy   (nx,ny+1)       matrix porosity at the interface in
 %                               y-direction
-%        Dfm    (nf,nx*ny)      coupling matrix between fracture and matrix
-%                               for transport diffusion
-%        Dmf    (nx*ny,nf)      coupling matrix between matrix and fracture
-%                               for transport diffusion
 %
 %  Output: 
 %        Di     (nx*ny+nf,nx*ny+nf) diffusion matrix of the transport system
 %        ri     (nx*ny+nf,1)    diffusion rhs of the transport system
 
-global Dif ibcD FixT
+global lambda_l lambda_s ibcD FixT
 
-Dx = dx(2).*phix.*Dif./dx(1);
-Dy = dx(1).*phiy.*Dif./dx(2);
+Dx = dx(2).*(phix.*lambda_l+(1-phix).*lambda_s)./dx(1);
+Dy = dx(1).*(phiy.*lambda_l+(1-phiy).*lambda_s)./dx(2);
 
 Tdeast  = sparse(Nf(1),Nf(2));
 Tdwest  = sparse(Nf(1),Nf(2));
@@ -93,16 +89,6 @@ ri(ic4,1) = ri(ic4,1) + t4.*FixT(i4,1);
 %-------------------------------------------------------------%
 %        merging matrix and fracture matrix and rhs           %
 %-------------------------------------------------------------%
-Di_f = sparse(zeros(Nf_f));
-Ds = sum(Dmf,2);
-DsT = sum(Dfm,2);
-[m,n]=size(Di);
-B = spdiags(Ds,0,m,n);                                                     % Diagonal contribution of Dmf to the main diagonal of Di 
-[m,n]=size(Di_f);
-Bf = spdiags(DsT,0,m,n);                                                   % Diagonal contribution of Dfm to the main diagonal of Di 
-
-Di = Di + B;
-Di_f = Di_f + Bf;
-
-Di = [Di -Dmf; -Dfm Di_f];                                                 % Build the coupled diffusion block matrix
+Di_f = spdiags(zeros(Nf_f,1),0,Nf_f,Nf_f);
+Di = blkdiag(Di, Di_f);
 ri = vertcat(ri,rif);

@@ -1,4 +1,4 @@
-function [sNew] = transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
+function [tNew] = transport_heat_System(tN,tNf,vx,vy,vf,Vfm,Vmf,Vff,Q,QT,K_f,phi,phi_f,density_s,density_sf,density_l,density_lf)
 %  Assembles and solves the transport system. It consists of the
 %  subfunctions for advective and diffusive transport
 %  ---------------------------------------------------------------------
@@ -29,46 +29,49 @@ function [sNew] = transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
 %  transportSystem(sN,sNf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy)
 %
 %  Input: 
-%        sN     (nx,ny)         old transport solution on the matrix
-%        sNf    (nf,1)          old transport solution in the fractures
+%        tN     (nx,ny)         old heat transport solution on the matrix
+%        tNf    (nf,1)          old heat transport solution in the fractures
 %        vx     (nx+1,ny)       matrix velocity in the x direction
 %        vy     (nx,ny+1)       matrix velocity in the y direction
 %        vf     (nf,1)          fracture velocity
 %        Vfm    (nf,nx*ny)      velocity matrix between fracture and matrix
 %        Vmf    (nx*ny,nf)      velocity matrix between matrix and fracture
 %        Vff    (nf*nf,nf*nf)   fracture-fracture intersection velocity
-%        Dfm    (nf,nx*ny)      coupling matrix between fracture and matrix
-%                               for transport diffusion
-%        Dmf    (nx*ny,nf)      coupling matrix between matrix and fracture
-%                               for transport diffusion
 %        phix   (nx+1,ny)       matrix porosity at the interface in
 %                               x-direction
 %        phiy   (nx,ny+1)       matrix porosity at the interface in
 %                               y-direction
+%        cprho  (2,1)           constants for the heat transport:
+%                               cprho(1) -> fluid / cprho(2) -> rock
 %
 %  Output: 
-%        sNew  (nx*ny+nf,1)     new transport solution vector
+%        tNew  (nx*ny+nf,1)     new heat transport solution vector
 
 
-global phi phi_f dx dxf dt Dif Nf Nf_f Nf_i K_f
+global lambda_l lambda_s cp_l cp_s dx dxf dt Nf Nf_f Nf_i 
+
+%-------------------------------------------------------------------------%
+% Calculate matrix interface permeability & porosity (harmonic average)
+%-------------------------------------------------------------------------%
+[phix, phiy] = calc_interface_values(phi);
 
 %-------------------------------------------------------------------------%
 %    Build Transport System                                               %
 %-------------------------------------------------------------------------%
-[Up,r]  = transportAdvection(vx,vy,vf,Vfm,Vmf,Vff,Nf,Nf_f,Nf_i);           % Convective Upwind Matrix
+[Up,r]  = transport_heat_Advection(vx,vy,vf,Vfm,Vmf,Vff,Q,QT,Nf,Nf_f,Nf_i,tN,tNf,cp_l.*density_l,cp_l.*density_lf);        % Convective Upwind Matrix
 
-if Dif == 0;
+if (phi*lambda_l+(1-phi)*lambda_s) == 0;
    Di = sparse(prod(Nf)+Nf_f,prod(Nf)+Nf_f);
    ri = sparse(prod(Nf)+Nf_f,1);
 else
-  [Di,ri] = transportDiffusion(Nf,Nf_f,dx,phix,phiy,Dfm,Dmf);              % Diffusive Matrix 
+  [Di,ri] = transport_heat_Diffusion(Nf,Nf_f,dx,phix,phiy);              % Diffusive Matrix 
 end
-   
-Ac      = sparse(phi.*prod(dx)/dt);                                        % Accumulation term matrix
-Acf = sparse(phi_f.*dxf.*sqrt(12.*K_f)/dt);                                % Accumulation term fracture
+
+Ac      = sparse((phi.*cp_l.*density_l+(1-phi).*cp_s.*density_s).*prod(dx)/dt);                                        % Accumulation term matrix
+Acf = sparse((phi_f.*cp_l.*density_lf+(1-phi_f).*cp_s.*density_sf).*dxf.*sqrt(12.*K_f)/dt);                                % Accumulation term fracture
 
 Ac = [Ac(:); Acf(:)];                                                      % Combine the accumulation terms
-snnf = [sN(:); sNf(:)];                                                    % for matrix and fracture
+snnf = [tN(:); tNf(:)];                                                    % for matrix and fracture
 
 A       = Up + diag(Ac(:)) + Di;                                           % Stiffness matrix
 rhs     = r + ri + sparse(snnf(:).*Ac(:));                                 % Right hand side
@@ -76,4 +79,4 @@ rhs     = r + ri + sparse(snnf(:).*Ac(:));                                 % Rig
 %-------------------------------------------------------------------------%
 %    Solve Transport System                                               %
 %-------------------------------------------------------------------------%
-sNew = A\rhs;
+tNew = A\rhs;

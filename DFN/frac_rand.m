@@ -13,7 +13,7 @@
 %  but WITHOUT ANY WARRANTY; without even the implied warranty of
 %  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 %  GNU General Public License for more details.
-% 
+%  
 %  You should have received a copy of the GNU General Public License
 %  along with LearnEDFM.  If not, see <http://www.gnu.org/licenses/>.
 %  ---------------------------------------------------------------------
@@ -26,7 +26,7 @@ rng(5044);
 
 N_fractures = 10;
 Nf_i = [];
-dxf = 1.2*sqrt(dx(1)*dx(1)+dx(2)*dx(2));
+dxf = sqrt(dx(1)*dx(1)+dx(2)*dx(2));
 
 xc = []; yc = [];
 xb = []; yb = [];
@@ -35,13 +35,16 @@ xe = []; ye = [];
 a = -90; b=90;
 beta = a + (b-a).*rand(N_fractures,1); % Fracture angle [°]
 int_max_length = uint8(0.4*max(len)/max(dx));
-for i=1:N_fractures 
+for i=1:N_fractures
     pass = 0;
     while pass < 1
         xy = rand(1,2);
         x = xy(1)*len(1);
         y = xy(2)*len(2);
-        r = randi([5 int_max_length],N_fractures,1);
+        L = 0.25; %randi([5 int_max_length],N_fractures,1);
+        r = round(L*len(1)./dxf,0);
+        betai = a + (b-a).*rand();
+        beta(i) = betai;
         
         dyi = sin(beta(i)*pi/180)*dxf;
         dxi = sqrt(dxf*dxf-dyi*dyi);
@@ -61,14 +64,14 @@ for i=1:N_fractures
     
     Nf_i(i) = length(xei);
 
-    xb =[xb xbi];
-    xe =[xe xei];
-    yb =[yb ybi];
-    ye =[ye yei];
+    xb =[xb round(xbi,4)];
+    xe =[xe round(xei,4)];
+    yb =[yb round(ybi,4)];
+    ye =[ye round(yei,4)];
 end
 
 Nf_f = length(xe);
-frac_angle = beta+90;
+frac_angle = atan2((ye-yb),(xe-xb))*180/pi;
 XY1 = [xb' yb' xe' ye'];
 XE = [xe; ye]';
 

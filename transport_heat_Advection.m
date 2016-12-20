@@ -1,5 +1,5 @@
-function [Up,rhs] = transportAdvection(vx,vy,vf,Vfm,Vmf,Vff,Nf,Nf_f,Nf_i)
-%UPMAT
+function [Up,rhs] = transport_heat_Advection(vx,vy,vf,Vfm,Vmf,Vff,Q,QT,Nf,Nf_f,Nf_i,T,Tf,cprho,cprho_f)
+%transportAdvection
 %  ---------------------------------------------------------------------
 %  Copyright (C) 2016 by the LearnEDFM authors
 % 
@@ -36,42 +36,59 @@ function [Up,rhs] = transportAdvection(vx,vy,vf,Vfm,Vmf,Vff,Nf,Nf_f,Nf_i)
 %        Vff    (nf*nf,nf*nf)   fracture-fracture intersection velocity
 %        Nf     (2,1)           matrix grid dimensions
 %        Nf_f                   total number of fracture segments
-%        Nf_i                   indivdidual numer of fracture segments
+%        Nf_i                   indivdidual numer of fracture segmentsith
+%        T      (nx,ny)         old transport solution on the matrix
+%        cprho  (2,1)           constants for the heat transport:
+%                               cprho(1) -> fluid / cprho(2) -> rock
 %
 %  Output: 
 %        Up    (nx*ny+nf,nx*ny+nf) advection matrix of the transport system
 %        rhs   (nx*ny+nf,1)      advection rhs of the transport system
 
-global FixT Q QT
+global FixT
 
 n    = Nf;
 nf   = Nf_f;
 N_fractures = length(Nf_i);                                                % Calculate the number of fractures
 
+ix      = (1+sign(vx))/2;                                                  % Velocity indicator for upwinding
+iy      = (1+sign(vy))/2;                                                  % for aritmetic mean set ix = iy = 1/2
 
 %-------------------------------------------------------------------------%
-%    Matrix                                                               %
+% Calculate interface values (harmonic average)
 %-------------------------------------------------------------------------%
-ix      = (1+sign(vx))/2;                                             % Velocity indicator for upwinding
-iy      = (1+sign(vy))/2;                                             % for aritmetic mean set ix = iy = 1/2
-     
-upw(1:Nf(1),:) = -ix(1:Nf(1),:)   .*vx(1:Nf(1),:);
-ups(:,1:Nf(2)) = -iy(:,1:Nf(2))   .*vy(:,1:Nf(2));
-upe(1:Nf(1),:) =  (1-ix(2:Nf(1)+1,:)) .*vx(2:Nf(1)+1,:);
-upn(:,1:Nf(2)) =  (1-iy(:,2:Nf(2)+1)) .*vy(:,2:Nf(2)+1);
+[cprhox, cprhoy] = calc_interface_values(cprho);
+[cprhof] = calc_interface_values_fracture(cprho_f);
+
+cprhovx = cprhox.*vx;
+cprhovy = cprhoy.*vy;
+
+%-------------------------------------------------------------------------%
+%    Upwind Matrix                                                        %
+%-------------------------------------------------------------------------%
+
+upw(1:Nf(1),:) = -ix(1:Nf(1),:)   .*cprhovx(1:Nf(1),:);
+ups(:,1:Nf(2)) = -iy(:,1:Nf(2))   .*cprhovy(:,1:Nf(2));
+upe(1:Nf(1),:) =  (1-ix(2:Nf(1)+1,:)) .*cprhovx(2:Nf(1)+1,:);
+upn(:,1:Nf(2)) =  (1-iy(:,2:Nf(2)+1)) .*cprhovy(:,2:Nf(2)+1);
 
 Txeast(2:n(1),:)   = upe(1:n(1)-1,:);    Txeast(1,:)     = 0;
 Tynorth(:,2:n(2))  = upn(:,1:n(2)-1);    Tynorth(:,1)    = 0;
 Txwest(1:n(1)-1,:) = upw(2:n(1),:);      Txwest(n(1),:)  = 0;
 Tysouth(:,1:n(2)-1)= ups(:,2:n(2));      Tysouth(:,n(2)) = 0;
 
-upd(1:Nf(1),1:Nf(2)) = ix(2:Nf(1)+1,1:Nf(2))   .*vx(2:Nf(1)+1,1:Nf(2))...
-                      +iy(1:Nf(1),2:Nf(2)+1)   .*vy(1:Nf(1),2:Nf(2)+1)...
-                      -(1-ix(1:Nf(1),1:Nf(2))) .*vx(1:Nf(1),1:Nf(2))...
-                      -(1-iy(1:Nf(1),1:Nf(2))) .*vy(1:Nf(1),1:Nf(2));
+upd(1:Nf(1),1:Nf(2)) = ix(2:Nf(1)+1,1:Nf(2))   .*cprhovx(2:Nf(1)+1,1:Nf(2))...
+                  +iy(1:Nf(1),2:Nf(2)+1)   .*cprhovy(1:Nf(1),2:Nf(2)+1)...
+                  -(1-ix(1:Nf(1),1:Nf(2))) .*cprhovx(1:Nf(1),1:Nf(2))...
+                  -(1-iy(1:Nf(1),1:Nf(2))) .*cprhovy(1:Nf(1),1:Nf(2));
 Ds      = [Tysouth(:) Txwest(:) upd(:) Txeast(:) Tynorth(:)];
 
 Up   = spdiags(Ds,[-n(1) -1 0 1 n(1)],n(1)*n(2),n(1)*n(2));
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                     CONSTRUCT  RHS                              %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rhs = sparse(zeros(n(1)*n(2),1));
 
@@ -100,58 +117,59 @@ rhs(iD2,1) = rhs(iD2,1) - t2.*FixT(i2,1);
 rhs(iD3,1) = rhs(iD3,1) - t3.*FixT(i3,1);
 rhs(iD4,1) = rhs(iD4,1) - t4.*FixT(i4,1);
 
+
+%clear t1 t2 t3 t4
+
 %------------------------------------------------------%
 %    source terms                                      %
 %------------------------------------------------------%                                                    
 iQ  = sparse((1+sign(Q(:)))/2);                                              % Indicator for in or outflow
 
-out = spdiags((1-iQ).*Q(:),0,prod(n),prod(n));
+out = spdiags(cprho(:).*(1-iQ).*Q(:),0,prod(n),prod(n));
 in  = iQ.*Q(:).*QT(:);
 
 rhs = sparse(rhs + in);
 Up  = sparse(Up  - out);
 
+
 %-------------------------------------------------------------------------%
 %    Fracture                                                             %
 %-------------------------------------------------------------------------%
+% This is the first order upwind scheme
 Tfeast = zeros(nf,1);
 Tfwest = zeros(nf,1);
 updf   = zeros(nf,1);
 
-upwf = zeros(nf,1);
-upef = zeros(nf,1);
-
-wf = min(-vf,0); 
-pf = max(-vf,0);
+wf = cprhof.*min(-vf,0); 
+pf = cprhof.*max(-vf,0);
 
 lios=0;
 ios = 0;                                                                   % offset counter for positioning in global fracture vector
 for i= 1:N_fractures
-    upef(ios+1:ios+Nf_i(i)) = -pf(lios+2:lios+Nf_i(i)+1);
-    upwf(ios+1:ios+Nf_i(i)) = +wf(lios+1:lios+Nf_i(i));
-    
     updf(ios+1:ios+Nf_i(i)) = pf(ios+2:ios+Nf_i(i)+1)...
                       -wf(ios+1:ios+Nf_i(i));
-        
-    Tfeast(ios+2:ios+Nf_i(i))     = upef(ios+1:ios+Nf_i(i)-1);
-    Tfwest(ios+1:ios+Nf_i(i)-1)   = upwf(ios+2:ios+Nf_i(i));
-    Tfeast(ios+1)     = 0;
-    Tfwest(ios+Nf_i(i)) =0;                                                % Note the procedure on global indexing used here which is 
+                  
+    Tfeast(ios+1:ios+Nf_i(i))     = -pf(lios+1:lios+Nf_i(i)); 
+
+    Tfwest(ios+1:ios+Nf_i(i))   = wf(lios+2:lios+Nf_i(i)+1);
+                                                                           % Note the procedure on global indexing used here which is 
                                                                            % explained in the calculation of the fracture interface
                                                                            % permeabilities in the EDFM main file
     ios = ios + Nf_i(i);
-    lios = lios + Nf_i(i) +0 ;
-end 
-       
-Dsf  = [Tfwest updf Tfeast];        
-Upf  = spdiags(Dsf,[-1 0 1],nf,nf);
+    lios = lios + Nf_i(i)  ;
+end
+Dsf  = [Tfwest updf Tfeast];      
+Upf  = spdiags(Dsf,[-1,0,1],nf,nf);
 rhsf = sparse(zeros(nf,1));
+
 
 %-------------------------------------------------------------------------%
 %    Matrix-Fracture                                                      %
 %-------------------------------------------------------------------------%
-Upmf = -max(-Vmf,0);
-Ds =  sum(max(Vmf,0),2);
+cprhoVmf = bsxfun(@times, cprho_f', Vmf);
+Upmf = -min(cprhoVmf,0);
+Ds =  sum(max(cprhoVmf,0),2);
+
 [m,n]=size(Up);
 B = spdiags(Ds,0,m,n);                                                     % Diagonal contribution of Amf to the main diagonal of A 
 Up = Up + B;
@@ -159,15 +177,18 @@ Up = Up + B;
 %-------------------------------------------------------------------------%
 %    Fracture-Matrix                                                      %
 %-------------------------------------------------------------------------%
-Upfm = -max(Vfm,0);
-DsT = sum(max(Vfm,0),2);
+cprhoVfm = bsxfun(@times, cprho_f, Vfm);
+Upfm = -min(cprhoVfm,0);
+DsT =  sum(max(-cprhoVfm,0),2);
+
 [m,n]=size(Upf);
 
 %-------------------------------------------------------------------------%
 %    Fracture-Fracture                                                    %
 %-------------------------------------------------------------------------%
-DsTT = sum(max(Vff,0),2);
-Tff = -max(Vff,0);
+cprhoVff = bsxfun(@times, cprho_f, Vff);
+DsTT = sum(max(cprhoVff,0),2);
+Tff = -max(cprhoVff,0);
 DsT = DsT + DsTT;
 Bf = spdiags(DsT,0,m,n);                                                   % Diagonal contribution of Afm and Aff to the main diagonal of A 
 Upf = Upf + Bf + Tff;
@@ -175,5 +196,5 @@ Upf = Upf + Bf + Tff;
 %-------------------------------------------------------------%
 %        merging matrix and fracture matrix and rhs           %
 %-------------------------------------------------------------%
-Up = [Up Upmf; Upfm Upf]; 
+Up = [Up -Upmf; -Upfm Upf]; 
 rhs = vertcat(rhs,rhsf);                                                   % Concenate the RHS vectors of matrix and fracture

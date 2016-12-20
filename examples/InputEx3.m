@@ -23,8 +23,15 @@
 %% GRID PARAMETERS ---------------------------------------------------------------------------------%
 global Nf Nf_f len dx
 len     = [500 500];                    % physical length of the domain in x and y direction [m]
-Nf      = [99 99];  	                % number of cells in x and y direction
+Nf      = [51 51];  	                % number of cells in x and y direction
 dx      = len./Nf;                      % cell length [m]
+
+%% SIMULATION PARAMETER FOR TRANSPORT --------------------------------------------------------------%
+global dt
+timeSim  = 7200;%1e4;                         % total simulation time [s]
+dt       = 10;                           % time step length [s]
+tol    = 1.e-4;                       % saturation tolerance on pressure-concentration-heat loop [-]
+maxit    = 100;                         % maximum number of pressure concentration-heat loops to converge
 
 %% FRACTURE NETWORK
 % Crossed fracture test case
@@ -42,38 +49,18 @@ if (dxf < min(dx))
     error('dxf < dx')
 end
 
-%% PERMEABILITY ------------------------------------------------------------------------------------%
-global K K_f
-K       = ones(Nf(1),Nf(2))*1e-9; 	    % permeability field [m2]
-K_f     = ones(Nf_f,1)*1e-5; 	        % fracture permeability field [m2]
-
-%% Porosity ----------------------------------------------------------------------------------------%
-global phi phi_f
-phi     = ones(Nf(1),Nf(2))*0.3;	    % porosity field
-phi_f   = ones(Nf_f,1)*0.3;             % fracture porosity field
-
 %% INITIAL CONDITIONS--------------------------------------------------------------------------------%
-global s0 s0f smax   
-s0   = zeros(Nf(1),Nf(2));              % Initial saturation (normalized concentration) [-]
-s0f  = zeros(Nf_f,1);
-smax = 1;                               % maximum concentration [kg/m3] for normalization
+global cmax   
+c0   = zeros(Nf(1),Nf(2));              % Initial saturation (normalized concentration) [-]
+c0f  = zeros(Nf_f,1);
+cmax = 1;                               % maximum concentration [kg/m3] for normalization
 
-global T0 T0f
 T0   = zeros(Nf(1),Nf(2));              % Initial matrix temperature [°C]
 T0f  = zeros(Nf_f,1);                   % Initial fracture temperature [°C]
+tmax = 0;                              % maximum temperature [°C] for plotting
 
-%% PHASE PROPERTIES---------------------------------------------------------------------------------%
-global viscosity density gravity
-viscosity = [0.01 0.01];                % viscosity [kg/m/s] [viscosity(s=0) viscosity(s=smax)]
-density   = [935 992];                  % density [kg/m3] [density(s=0) density(s=smax)]
-gravity   = 0;                          % gravity acceleration in y [m/s2]
-
-%% SIMULATION PARAMETER FOR TRANSPORT --------------------------------------------------------------%
-global dt
-timeSim  = 10e4;                        % total simulation time [s]
-dt       = 100;                         % time step length [s]
-tolpS    = 1.e-4;                       % saturation tolerance on pressure-saturation loop [-]
-maxpS    = 100;                         % maximum number of pressure saturation loops to converge
+p0   = zeros(Nf(1),Nf(2));              % Initial matrix pressure [Pa]
+p0f  = zeros(Nf_f,1);                   % Initial fracture pressure [Pa]
 
 %% BC FLUID ----------------------------------------------------------------------------------------%
 global Fix ibcs                                
@@ -82,20 +69,49 @@ Fix  = zeros(2*sum(Nf),1);              % value N [m2/s] (inflow>0); D [Pa]
 
 ibcs(1:Nf(2)) = 1;
 ibcs(Nf(2)+1:2*Nf(2))=1;
-Fix(1:Nf(2)) = 5e6;
+Fix(1:Nf(2)) = 5e6;%5e6;
 Fix(Nf(2)+1:2*Nf(2))=0;
 
 %% BC TRANSPORT ------------------------------------------------------------------------------------%
-global FixT
-FixT     = zeros(2*sum(Nf),1);           % normalized concentration of boundary flow [-]
-FixT(1:Nf(2)) = 1;
+flagTracerTransport = 1;
+flagHeatTransport = 0;
 
-%% DIFFUSION ------------------------------------------------------------------------%
-global Dif ibcD
-Dif     = 0;                            % [m2/s] molecular diffusion 
-ibcD    = zeros(2*sum(Nf),1);           % 1 -> Diffusion on boundary cell
+global FixT FixC
+FixT     = zeros(2*sum(Nf),1);           % normalized concentration of boundary flow [-]
+FixC     = zeros(2*sum(Nf),1);           % normalized concentration of boundary flow [-]
+
+FixC(1:Nf(2)) = 0.5;
 
 %% SOURCE TERMS ------------------------------------------------------------------------------------%
-global Q QT
 Q       = zeros(Nf);                    % source term [m2/s]; inflow positive
+QC      = zeros(Nf);                    % normalized concentration for source term [-] 
 QT      = zeros(Nf);                    % normalized concentration for source term [-] 
+
+%% GRAVITY---------------------------------------------------------------------------------%
+global gravity
+gravity   = 9.81;                          % gravity acceleration in y [m/s2]
+
+%% PERMEABILITY ------------------------------------------------------------------------------------%
+K       = ones(Nf(1),Nf(2))*1e-9; 	    % permeability field [m2]
+K_f     = ones(Nf_f,1)*1e-5; 	        % fracture permeability field [m2]
+
+%% Porosity ----------------------------------------------------------------------------------------%
+phi     = ones(Nf(1),Nf(2))*0.3;	    % porosity field
+phi_f   = ones(Nf_f,1)*0.3;             % fracture porosity field
+
+%% ROCK DENSITY ------------------------------------------------------------------------%
+density_s = 2000*ones(Nf);       % density of the rock [kg/m3]
+density_sf = 2000*ones(Nf_f,1); % density of the rock [kg/m3]
+
+%% THERMAL DIFFUSION ------------------------------------------------------------------------%
+global lambda_l lambda_s cp_l cp_s ibcD
+lambda_l = 0;                           % Thermal conductivity of the fluid [W/(m*K)]
+lambda_s = 0;                           % Thermal conductivity of the rock [W/(m*K)]
+cp_l = 0;                               % Specific heat capacity of the fluid [J/(kg*K)]
+cp_s = 0;                               % Specific heat capacity of the rock [J/(kg*K)]
+ibcD    = zeros(2*sum(Nf),1);           % 1 -> Diffusion on boundary cells
+
+%% MOLECULAR DIFFUSION ------------------------------------------------------------------------%
+global DifC ibcDC
+DifC     = 0;                  % [m2/s] molecular diffusion 
+ibcDC    = zeros(2*sum(Nf),1);           % 1 -> Diffusion on boundary cells

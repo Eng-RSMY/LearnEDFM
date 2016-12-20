@@ -154,7 +154,7 @@ addpath(genpath(pwd));
 %% DEFAULTS AND GLOBAL PARAMETERS                                        %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-global Nf len Fix Q Txk Tyk Tfk dt XY1
+global Nf len dt innerIter
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%         INITIALIZATION                                                %%
@@ -165,67 +165,36 @@ if (nargin<1)
 end
 if (nargin<2), showPlot = 1; end
 
-eval(inputFile)                                                            % Load Input Data 
+run(inputFile)                                                            % Load Input Data 
 
 x = linspace(0,len(1),2*Nf(1)+1); x = x(2:2:end);                          % x grid vector (used in plots)
 y = linspace(0,len(2),2*Nf(2)+1); y = y(2:2:end);                          % y grid vector (used in plots)
 
-TNew  = T0  .* ones(Nf);                                                   % initialize matrix   temperature solution vector
-TNewf = T0f .* ones(Nf_f,1);                                               % initialize fracture temperature solution vector
+global frac_mean_mat frac_grad_mat frac_grad_expand_mat
+frac_mean_mat = calc_frac_mean_mat(N_fractures,Nf_f, Nf_i);
+frac_grad_mat = calc_frac_grad_mat(N_fractures,Nf_f, Nf_i);
+frac_grad_expand_mat = calc_frac_grad_expand_mat(N_fractures,Nf_f, Nf_i);
 
-sNew  = s0  .* ones(Nf);                                                   % initialize matrix   tracer saturation solution vector
-sNewf = s0f .* ones(Nf_f,1);                                               % initialize fracture tracer saturation solution vector
-sN    = [sNew(:); sNewf(:)];
 
-% Calculate matrix interface permeability & porosity (harmonic average)
-Txk             = sparse(Nf(1)+1,Nf(2));                                                                                                                
-Tyk             = sparse(Nf(1),Nf(2)+1);
-Txk(2:Nf(1),:)  = 2./(1./K(1:Nf(1)-1,:) + 1./K(2:Nf(1),:));             
-Tyk(:,2:Nf(2))  = 2./(1./K(:,1:Nf(2)-1) + 1./K(:,2:Nf(2)));
-Txk(1,:)        = K(1,:);                                    
-Txk(Nf(1)+1,:)  = K(Nf(1),:);
-Tyk(:,1)        = K(:,1);
-Tyk(:,Nf(2)+1)  = K(:,Nf(2));
+tNew  = T0  .* ones(Nf);                                                   % initialize matrix   temperature solution vector
+tNewf = T0f .* ones(Nf_f,1);                                               % initialize fracture temperature solution vector
+tN    = [tNew(:); tNewf(:)];
 
-phix            = sparse(Nf(1)+1,Nf(2));
-phiy            = sparse(Nf(1),Nf(2)+1);
-phix(2:Nf(1),:) = 2./(1./phi(1:Nf(1)-1,:) + 1./phi(2:Nf(1),:));           
-phiy(:,2:Nf(2)) = 2./(1./phi(:,1:Nf(2)-1) + 1./phi(:,2:Nf(2)));
-phix(1,:)       = phi(1,:);                                    
-phix(Nf(1)+1,:) = phi(Nf(1),:);
-phiy(:,1)       = phi(:,1);
-phiy(:,Nf(2)+1) = phi(:,Nf(2));
+cNew  = c0  .* ones(Nf);                                                   % initialize matrix   tracer saturation solution vector
+cNewf = c0f .* ones(Nf_f,1);                                               % initialize fracture tracer saturation solution vector
+cN    = [cNew(:); cNewf(:)];
 
-% Calculate fracture interface permeability % porosity (harmonic average)
-% Each fracture has one more interface than its fractures elements which
-% raises an issue with the harmonic averaging. It can be resolved by an 
-% index shift by 1 has to be done in each iteration leading to an
-% overall dimension for Tfk of (Nf_f + N_fractures,1). This is of course
-% true also for the velocity, saturation and porosity fields.
-% Note that any changes here have also to be transfered to the other loops
-% over the fractures.
-Tfk = zeros(Nf_f+N_fractures,1);
-phif = zeros(Nf_f+N_fractures,1);
-ios = 0;                                                                   % offset counter for positioning in global fracture vector
-lios = 0;                                                                  % offset counter for the left side
-for i= 1:N_fractures 
-    Tfk(lios+2:lios+Nf_i(i))     = 2./(1./K_f(ios+1:ios+Nf_i(i)-1) + 1./K_f(ios+2:ios+Nf_i(i))); 
-    Tfk(lios+1)          = K_f(ios+1);
-    Tfk(lios+Nf_i(i)+1)     = K_f(ios+Nf_i(i));
-    
-    phif(lios+2:lios+Nf_i(i))     = 2./(1./phif(ios+1:ios+Nf_i(i)-1) + 1./phif(ios+2:ios+Nf_i(i))); 
-    phif(lios+1)          = phif(ios+1);
-    phif(lios+Nf_i(i)+1)     = phif(ios+Nf_i(i));
-    
-    ios = ios + Nf_i(i);
-    lios = lios + Nf_i(i) + 1;                                             % the additional offset of +1 is due to the additional interface at the end of each fracture
-end
+p  = p0  .* ones(Nf);                                                   % initialize matrix   tracer saturation solution vector
+pf = p0f .* ones(Nf_f,1);                                               % initialize fracture tracer saturation solution vector
+pN    = [p(:); pf(:)];
 
-% Initialize the DFN connectivity and grid intersections
-% This provides also the off diagonal coupling matrices for the pressure
-% solver. 
-[~,~,~,~,~,~,~,l,l_f]  = initialize(sNew,sNewf,TNew,TNewf);                % Initialize the matrix transmissivity        
-[Tfm,Tmf,Tff,Dfm,Dmf,Z] = initializeDFN(x,y,XY1,K_f,l,l_f);
+%% Find the intersection of each segment with the grid and compute the
+%% Connectivity Index based on the segments lengths and the average distance
+%% to the fracture
+CI = intersectionsGrid(x,y,XY1);
+[row,col] = intersectionsSegments(XY1,XY1);
+
+[Tx,Ty,Tf,Tfm,Tff,g,gf,density_l,density_lf]  = initialize(K, K_f,cNew,cNewf,tNew,tNewf,p,pf,CI,row,col);
 
 if showPlot
     s = linspace(0,1,256);
@@ -234,23 +203,37 @@ if showPlot
     cmap = diverging_map(s,rgb1,rgb2);
 
     figure(1)
-    h1= pcolor(x,y,s0');
+    h1= pcolor(x,y,c0');
     hold on
     colormap(cmap)
     line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','r');
     shading interp
     axis square
     
-    figure(2)
-    h2 = pcolor(x,y,sNew');
-    hold on
-    colormap(cmap)
-    shading interp
-    axis square
-    caxis([0 1]);
-    line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','r');
+    if(flagTracerTransport)
+        figure(2)
+        h2 = pcolor(x,y,cNew');
+        hold on
+        colormap(cmap)
+        shading interp
+        axis square
+        caxis([0 1]);
+        line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','k','LineWidth',2);
+        h3 = scatter(xe,ye,30,cNewf,'filled');
+    end
     
-    drawnow
+    if(flagHeatTransport)
+        figure(3)
+        h4 = pcolor(x,y,tNew');
+        hold on
+        colormap(cmap)
+        shading interp
+        axis square
+        caxis([0 tmax]); 
+        line([XY1(:,1)';XY1(:,3)'],[XY1(:,2)';XY1(:,4)'],'Color','k','LineWidth',2);
+        h5 = scatter(xe,ye,30,tNewf,'filled');
+        drawnow
+    end
 
     nframe=ceil(timeSim/dt);
     mov(1:nframe)= struct('cdata',[],'colormap',[]);
@@ -262,47 +245,69 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 time = dt;                                                                 % Set the time for the first timestep                                             
 i = 0;                                                                     % Count all timesteps
-
 while (time <= timeSim)                                                    % Time loop
     i      = i+1;
     if showPlot, disp(sprintf('Simulation time = %d s',time));end
-    sOld      = sNew;                                                      % Update saturation of previous iteration (time loop)
-    sOldf     = sNewf;
-    eps       = inf;
+    cOld      = cNew;                                                      % Update saturation of previous iteration (time loop)
+    cOldf     = cNewf;
+    tOld      = tNew;                                                      % Update saturation of previous iteration (time loop)
+    tOldf     = tNewf;
+    
+    pOld      = p;                                                      % Update saturation of previous iteration (time loop)
+    pOldf     = pf;
+    
+    epsP       = inf;
+    epsC       = inf;
+    epsT       = inf;
+        
     innerIter = 1;
-
-    while (eps >= tolpS && innerIter <= maxpS)                             % Inner loop due to saturation dependence of gravity and viscosity
-
-        sIt = sN;                                                          % Update saturation of previous iteration (inner loop)
-
-        [Tx,Ty,Tf,G,g,Gf,gf,~,~]  = initialize(sNew,sNewf,TNew,TNewf);     % Initialize (update) the transmissivity based on new temperature
+    while ((epsP >= tol || epsC >= tol || epsT >= tol) && innerIter <= maxit)                            % Inner loop due to saturation dependence of gravity and viscosity
+        cIt = cN;                                                          % Update saturation of previous iteration (inner loop)
+        tIt = tN;                                                          % Update saturation of previous iteration (inner loop)
+        pIt = pN;
+        
+        [Tx,Ty,Tf,Tfm,Tff, g,gf,density_l,density_lf]  = initialize(K, K_f,cNew,cNewf,tNew,tNewf,p,pf,CI,row,col);
+                                                                           % Initialize (update) the transmissivity based on new temperature
                                                                            % If the viscosity and density are not temperature dependent, this
                                                                            % function could be moved outside of the timeloop
- 
-        [A,rhs]= pressureSystem(Fix,ibcs,Tx,Ty,Tf,G,Gf,Q, Tfm, Tmf, Tff, Nf_i); % Construct pressure matrix and rhs vectors
+                                                                           
+        [pN]= pressureSystem(pOld,pOldf,Fix,ibcs,Tx,Ty,Tf,g,gf,Q,Tfm,Tff,Nf_i,phi,phi_f,density_l,density_lf,K_f); % Construct pressure matrix and rhs vectors
 
-        u = A\rhs;                                                         % Solve the pressure equation
-
-        p = reshape(u(1:prod(Nf)),Nf(1),Nf(2));                            % Assign solution to matrix solution array 
-        pf = u(prod(Nf)+1:length(u));                                      % Assign solution to fracture solution vector
         
+        p = reshape(pN(1:prod(Nf)),Nf(1),Nf(2));                            % Assign solution to matrix solution array 
+        pf = pN(prod(Nf)+1:length(pN));                                      % Assign solution to fracture solution vector
         
-        [vx,vy,vf,Vfm,Vmf,Vff] = calcVelocity(p,pf,Tx,Ty,Tf,Tfm,Tmf,Tff,g,gf); % Calculate Darcy velocities     
-
-        [sN]  = transportSystem(sOld,sOldf,vx,vy,vf,Vfm,Vmf,Vff,Dfm,Dmf,phix,phiy); % Solve transport equation for phase alpha
-
-        sNew = sN(1:prod(Nf));                                             % Assign transport solution to matrix solution array 
-        sNew= reshape(sNew,Nf(1),Nf(2));                         
-        sNewf = sN(prod(Nf)+1:length(sN));                                 % Assign transport solution to fracture solution array 
+        [vx,vy,vf,Vfm,Vmf,Vff] = calcVelocity(p,pf,Tx,Ty,Tf,Tfm,Tff,g,gf); % Calculate Darcy velocities     
         
-        eps = norm((abs(sN(:) - sIt(:))),inf); 
+        if(flagTracerTransport)
+            [cN]  = transport_mass_System(cOld,cOldf,vx,vy,vf,Vfm,Vmf,Vff,Q,QC,phi,phi_f,K_f); % Solve transport equation for phase alpha
+
+            cNew = cN(1:prod(Nf));                                             % Assign transport solution to matrix solution array 
+            cNew= reshape(cNew,Nf(1),Nf(2));                         
+            cNewf = cN(prod(Nf)+1:length(cN));                                 % Assign transport solution to fracture solution array 
+        end
+        
+        if(flagHeatTransport)
+            [tN]  = transport_heat_System(tOld,tOldf,vx,vy,vf,Vfm,Vmf,Vff,Q,QT,K_f,phi,phi_f,density_s,density_sf,density_l,density_lf); % Solve transport equation for phase alpha
+
+            tNew = tN(1:prod(Nf));                     
+
+            % Assign transport solution to matrix solution array 
+            tNew= reshape(tNew,Nf(1),Nf(2));                         
+            tNewf = tN(prod(Nf)+1:length(tN));                                 % Assign transport solution to fracture solution array 
+        end
+        
+        epsP = norm((abs(pN(:) - pIt(:))),inf); 
+        epsC = norm((abs(cN(:) - cIt(:))),inf); 
+        epsT = norm((abs(tN(:) - tIt(:))),inf); 
+        
         if showPlot
-            disp(sprintf('\t Residual at %d. loop: %d', innerIter,eps));       
+            disp(sprintf('\t Residual at %d. loop: %d , %d and %d', innerIter,epsP, epsC, epsT));       
         end
         innerIter = innerIter+1;
 
 
-        if (innerIter == 100), error('outer finescale loop did not converge'), end
+        if (innerIter == maxit), error('outer finescale loop did not converge'), end
     end
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -310,7 +315,14 @@ while (time <= timeSim)                                                    % Tim
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     if showPlot
         set(h1,'cdata',p');
-        set(h2,'cdata',sNew');
+        if(flagTracerTransport)
+            set(h2,'cdata',cNew');
+            set(h3,'cdata',cNewf);
+        end
+        if(flagHeatTransport)
+            set(h4,'cdata',tNew');
+            set(h5,'cdata',tNewf);
+        end
         drawnow
         mov(i)=getframe(gcf);
     end

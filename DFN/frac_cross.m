@@ -24,7 +24,7 @@ global dxf Nf_i frac_angle XY1
 
 N_fractures = 2;
 
-dx_f = 1.2*sqrt(dx(1)*dx(1)+dx(2)*dx(2));
+dx_f = sqrt(dx(1)*dx(1)+dx(2)*dx(2));
 
 xc = [];
 yc = [];
@@ -35,38 +35,51 @@ ye = [];
 
 Nf_i = [];
 
-dxl = 0;
-dy = dx_f;
+dxi = 0;
+dyi = dx_f;
 
-ybi = 2:dy:7-dy;
-yei = 2+dy:dy:7;
-yci = 2+dy/2:dy:7;
-xci = 4.5*ones(size(yci));
-xc =[xc xci];
-yc =[yc yci];
-xb =[xb xci];
-xe =[xe xci];
-yb =[yb ybi];
-ye =[ye yei];
+x = 4.5; y=2;
+r = floor(5/9.*min(len(1),len(2))./dx_f);
+ybi = y:dyi:y+r*dyi-dyi; 
+yei = y+dyi:dyi:y+r*dyi;
+
+
+%ybi = 2:dy:7-dy;
+%yei = 2+dy:dy:7;
+xci = 4.5*ones(size(yei));
+
+xb =[xb round(xci,4)];
+xe =[xe round(xci,4)];
+yb =[yb round(ybi,4)];
+ye =[ye round(yei,4)];
 
 Nf_i(1) = length(xci);
 
-dxl = dx_f;
-dy = 0;
-xbi = 2:dxl:7-dxl; 
-xei = 2+dxl:dxl:7;
-xci = 2+dxl/2:dxl:7;
+dxi = dx_f;
+dyi = 0;
+
+x = 2; y=4.5;
+xbi = x:dxi:x+r*dxi-dxi; 
+xei = x+dxi:dxi:x+r*dxi;
+
+%xbi = 2:dxl:7-dxl; 
+%xei = 2+dxl:dxl:7;
+%xci = 2+dxl/2:dxl:7;
 yci = 4.5*ones(size(xci));
 
 Nf_i(2) = length(xei);
 
-xc =[xc xci];
-yc =[yc yci];
-xb =[xb xbi];
-xe =[xe xei];
-yb =[yb yci];
-ye =[ye yci];
+xc =[xc round(xci,4)];
+yc =[yc round(yci,4)];
+xb =[xb round(xbi,4)];
+xe =[xe round(xei,4)];
+yb =[yb round(yci,4)];
+ye =[ye round(yci,4)];
 
+ListOfVariables = who;
+for k = 1:length(ListOfVariables)
+   assignin('base',ListOfVariables{k},eval(ListOfVariables{k}))
+end 
 
 XY1 = [xb' yb' xe' ye'];
 XY2(:,1,1) = xb';
@@ -76,5 +89,5 @@ XY2(:,2,2) = ye';
 XE = [xe; ye]';
 
 Nf_f = length(xe);
-frac_angle = [90 0];
+frac_angle = atan2((ye-yb),(xe-xb))*180/pi;
 dxf = sqrt((xb(1)-xe(1))^2 + (yb(1)-ye(1))^2);
